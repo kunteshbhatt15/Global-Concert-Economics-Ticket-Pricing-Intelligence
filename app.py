@@ -419,12 +419,25 @@ def render_shap_waterfall(input_df: pd.DataFrame, artifacts: dict) -> None:
         height=520,
         margin=dict(l=20, r=24, t=20, b=20),
         legend_title_text="",
-        font=dict(size=13, color="#17202a"),
+        font=dict(size=13, color="#111827"),
+        legend=dict(font=dict(color="#111827", size=12)),
         plot_bgcolor="#ffffff",
         paper_bgcolor="#ffffff",
     )
-    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="#25313f", gridcolor="#edf2f7")
-    fig.update_yaxes(tickfont=dict(size=12))
+    fig.update_xaxes(
+        title_font=dict(color="#111827", size=13),
+        tickfont=dict(color="#111827", size=12),
+        zeroline=True,
+        zerolinewidth=2,
+        zerolinecolor="#25313f",
+        gridcolor="#d8e0e8",
+        linecolor="#25313f",
+    )
+    fig.update_yaxes(
+        title_font=dict(color="#111827", size=13),
+        tickfont=dict(color="#111827", size=12),
+        linecolor="#25313f",
+    )
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("SHAP values table"):
