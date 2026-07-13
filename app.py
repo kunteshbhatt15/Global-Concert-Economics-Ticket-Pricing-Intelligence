@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
@@ -20,6 +20,7 @@ from model_pipeline import (
     modeling_frame,
     predict_price,
     save_artifacts,
+    transform_input,
 )
 
 
@@ -352,6 +353,35 @@ def build_prediction_report(
     return report.to_csv(index=False).encode("utf-8")
 
 
+@st.cache_data(show_spinner=False)
+def shap_package_available() -> bool:
+    try:
+        import shap  # noqa: F401
+        import matplotlib.pyplot as plt  # noqa: F401
+    except Exception:
+        return False
+    return True
+
+
+def render_shap_waterfall(input_df: pd.DataFrame, artifacts: dict) -> None:
+    if not shap_package_available():
+        st.info("Install `shap` and `matplotlib` from requirements.txt to enable the waterfall plot.")
+        return
+
+    import matplotlib.pyplot as plt
+    import shap
+
+    transformed = transform_input(input_df, artifacts)
+    explainer = shap.TreeExplainer(artifacts["model"])
+    shap_values = explainer(transformed)
+
+    st.subheader("SHAP Waterfall Plot")
+    st.caption("Single-prediction feature contributions after the app's preprocessing pipeline.")
+    fig = plt.figure(figsize=(10, 6))
+    shap.plots.waterfall(shap_values[0], max_display=12, show=False)
+    st.pyplot(fig, clear_figure=True)
+
+
 def feature_label(name: str, column: str) -> str:
     return f"{name} ({column})"
 
@@ -651,8 +681,10 @@ def predictor(df: pd.DataFrame, artifacts: dict) -> None:
     )
 
     with st.expander("Encoded model input"):
-        st.caption("SHAP single-prediction contribution can be added here later for a true waterfall plot.")
         st.dataframe(input_df, width="stretch", hide_index=True)
+
+    with st.expander("SHAP single-prediction contribution", expanded=True):
+        render_shap_waterfall(input_df, artifacts)
 
 
 def what_if(df: pd.DataFrame, artifacts: dict) -> None:
