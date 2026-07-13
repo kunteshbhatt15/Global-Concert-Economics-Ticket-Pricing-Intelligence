@@ -212,6 +212,17 @@ st.markdown(
         color: #ffffff !important;
         fill: #ffffff !important;
     }
+    div[data-testid="stExpander"] details summary,
+    div[data-testid="stExpander"] details summary *,
+    div[data-testid="stExpander"] details summary p {
+        color: #f6fbff !important;
+        opacity: 1 !important;
+    }
+    div[data-testid="stExpander"] details summary {
+        background: #1f2430;
+        border-radius: 6px;
+        padding: 8px 10px;
+    }
     .small-muted {
         color: var(--muted);
         font-size: 0.92rem;
@@ -357,7 +368,6 @@ def build_prediction_report(
 def shap_package_available() -> bool:
     try:
         import shap  # noqa: F401
-        import matplotlib.pyplot as plt  # noqa: F401
     except Exception:
         return False
     return True
@@ -365,21 +375,64 @@ def shap_package_available() -> bool:
 
 def render_shap_waterfall(input_df: pd.DataFrame, artifacts: dict) -> None:
     if not shap_package_available():
-        st.info("Install `shap` and `matplotlib` from requirements.txt to enable the waterfall plot.")
+        st.info("Install `shap` from requirements.txt to enable the contribution plot.")
         return
 
-    import matplotlib.pyplot as plt
     import shap
 
     transformed = transform_input(input_df, artifacts)
     explainer = shap.TreeExplainer(artifacts["model"])
     shap_values = explainer(transformed)
+    values = shap_values.values[0]
+    base_value = float(np.ravel(shap_values.base_values)[0])
+    predicted_value = base_value + float(values.sum())
 
-    st.subheader("SHAP Waterfall Plot")
-    st.caption("Single-prediction feature contributions after the app's preprocessing pipeline.")
-    fig = plt.figure(figsize=(10, 6))
-    shap.plots.waterfall(shap_values[0], max_display=12, show=False)
-    st.pyplot(fig, clear_figure=True)
+    shap_df = pd.DataFrame(
+        {
+            "Feature": transformed.columns,
+            "Contribution": values,
+            "Encoded value": transformed.iloc[0].values,
+        }
+    )
+    shap_df["Abs contribution"] = shap_df["Contribution"].abs()
+    shap_df["Direction"] = np.where(shap_df["Contribution"] >= 0, "Increases price", "Decreases price")
+    top = shap_df.sort_values("Abs contribution", ascending=False).head(12).sort_values("Contribution")
+
+    st.subheader("SHAP Contribution Plot")
+    st.caption("Top features explaining this single prediction after preprocessing.")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Base value", format_money(base_value))
+    c2.metric("SHAP prediction", format_money(predicted_value))
+    c3.metric("Top drivers shown", f"{len(top)}")
+
+    fig = px.bar(
+        top,
+        x="Contribution",
+        y="Feature",
+        orientation="h",
+        color="Direction",
+        color_discrete_map={"Increases price": "#ef476f", "Decreases price": "#3b82f6"},
+        hover_data={"Encoded value": ":.3f", "Abs contribution": ":.3f"},
+        labels={"Contribution": "SHAP contribution in USD", "Feature": ""},
+    )
+    fig.update_layout(
+        height=520,
+        margin=dict(l=20, r=24, t=20, b=20),
+        legend_title_text="",
+        font=dict(size=13, color="#17202a"),
+        plot_bgcolor="#ffffff",
+        paper_bgcolor="#ffffff",
+    )
+    fig.update_xaxes(zeroline=True, zerolinewidth=2, zerolinecolor="#25313f", gridcolor="#edf2f7")
+    fig.update_yaxes(tickfont=dict(size=12))
+    st.plotly_chart(fig, width="stretch")
+
+    with st.expander("SHAP values table"):
+        st.dataframe(
+            shap_df.sort_values("Abs contribution", ascending=False).head(20).drop(columns=["Abs contribution"]),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def feature_label(name: str, column: str) -> str:
