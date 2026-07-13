@@ -772,8 +772,6 @@ def main() -> None:
 
     df = get_data()
     artifacts = get_artifacts()
-    if "_load_warning" in artifacts:
-        st.sidebar.warning("Model artifacts were rebuilt from the dataset for this session.")
     page = st.sidebar.radio(
         "Navigate",
         ["Overview", "Price Predictor", "What-If Simulator", "Model Intelligence", "Data Explorer"],
